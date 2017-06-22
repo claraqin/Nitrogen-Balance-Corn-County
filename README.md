@@ -18,7 +18,7 @@ County-level yield data can be retrieved from the USDA National Agricultural Sta
 
 **County-level N-balance for corn** can then be calculated through the following equation:
 
-*N*.*b**a**l**a**n**c**e* = *N*.*i**n**p**u**t* − *N*.*o**u**t**p**u**t* = *N*.*i**n**p**u**t* − *C**r**o**p*.*P**r**o**d**u**c**t**i**o**n* \* *N*.*r**e**m**o**v**a**l*.*r**a**t**e*
+N.balance = N.input - N.output = N.input - Crop.Production \* N.removal.rate
 
 This simplified N-balance equation is sufficient for our purpose of generating county-level validation data, though we recognize that we are making the following assumptions:
 
