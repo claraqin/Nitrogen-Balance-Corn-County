@@ -18,9 +18,9 @@ The main barrier to successfully deploying a satellite-based remote sensing syst
 
 In this pilot project, **we do not attempt to predict field-scale attributes using satellite remote sensing**. Instead, we attempt to predict the mean and heterogeneity of **N-balance at the county scale**.
 
-County-scale information on total N fertilizer usage was made available in the EPA's 2011 National Emissions Inventory (NEI) report. When combined with the Cropland Data Layer's pixel counts of each land cover type for each county, we can identify those counties where the vast majority (i.e. > 95%) of all cultivated area consists of corn/soybean, and make the assumption that all N fertilizer within the county was applied to corn acreage. Through this process we can arrive at a **mean fertilizer application rate for corn** for a large subset of counties.
+County-scale estimates of total N fertilizer usage was made available in the EPA's National Emissions Inventory (NEI) reports for 2011 and 2014. When combined with the Cropland Data Layer's pixel counts of each land cover type for each county, we can identify those counties where the vast majority (i.e. > 95%) of all cultivated area consists of corn/soybean, and make the assumption that all N fertilizer within the county was applied to corn acreage. Through this process we can arrive at a **mean fertilizer application rate for corn** for a subset of counties.
 
-County-level yield data can be retrieved from the USDA National Agricultural Statistics Service (NASS) via Quick Stats.
+County-level production (and yield) data can be retrieved from the USDA National Agricultural Statistics Service (NASS) via Quick Stats.
 
 **County-level N-balance for corn** can then be calculated through the following equation:
 
@@ -28,7 +28,7 @@ County-level yield data can be retrieved from the USDA National Agricultural Sta
 N.balance = N.input - N.output = N.input - Crop.Production * N.removal.rate
 
 
-This simplified N-balance equation is sufficient for our purpose of generating county-level validation data, though we recognize that we are making the following assumptions:
+This simplified N-balance equation is sufficient for our purpose of generating county-level validation data for predicting corn N-balance, though we recognize that we are making the following assumptions:
 
 * Corn stover / stubble is not removed from the field.
 * The grain has the standard moisture content of 15.5%.
@@ -36,13 +36,13 @@ This simplified N-balance equation is sufficient for our purpose of generating c
 
 *See <http://www.ipni.net/article/IPNI-3296> for details on the grain N calculation.*
 
-Once N-balance has been calculated for each county, we will have produced a dataset for use in validating an *a priori* model that converts vegetation indices collected through satellite remote sensing into county-level N-balance predictions.
+Once corn N-balance has been calculated for each county, we will have produced a dataset for use in validating an *a priori* model that converts vegetation indices collected through satellite remote sensing into county-level N-balance predictions.
 
 ## Analysis
 
 Define constants, load libraries, and import data.
 
-```{r, message=FALSE}
+```{r, message=FALSE, warning=FALSE}
 # Constants
 
 SQ_METER_PER_PIXEL <- 900
@@ -57,8 +57,6 @@ library(reshape2)
 library(ggplot2)
 
 # Data imports
-
-#setwd("C:/Users/kqin/Documents/Remote Sensing/Remote Sensing of N/Validation Data/CDL")
 
 fips <- read.csv("fips_codes.csv")
 
