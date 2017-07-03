@@ -181,7 +181,7 @@ names(Corn2014.w)[4] <- "Acres.NASS"
 names(Corn2014.w)[5] <- "Production.NASS"
 ```
 
-How well does CDL data compare to NASS data? Check acres:
+How well does CDL data compare to NASS data? Check county total corn acres:
 
 ```{r}
 Nbalance <- merge(CDL2014.ac.select, Corn2014.w)
@@ -194,6 +194,13 @@ ggplot(Nbalance.cornsoy, aes(x=Acres.NASS, y=Corn_all)) + geom_point() +
 ```
 
 Looks like a good fit!
+
+How well does NEI data compare to NASS data? Check state total N fertilizer application:
+
+```{r}
+
+
+```
 
 Where are these counties?
 
