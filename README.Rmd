@@ -10,8 +10,6 @@ knitr::opts_chunk$set(echo = TRUE)
 #knitr::opts_knit$set(root.dir = "C:/Users/kqin/Documents/Remote Sensing/Remote Sensing of N/Validation Data/CDL")
 ```
 
-#### TO DO: Filter counties to not only have a high proportion of corn/soybean, but also a sufficiently high number of corn acres.
-
 ## Background
 
 The main barrier to successfully deploying a satellite-based monitoring system for targeted fertilizer conservation programs is the lack of sufficient ground-truthed field-scale fertilizer application data. In theory, if we could receive annual reports of yield, crop type, and nitrogen (N) fertilizer application rate from each field in the U.S., we could develop a crude N-balance prediction system that operates at the field-scale. However, this data is elusive in part because of the legitimate concern for farmers' privacy rights. A recent study from Iowa State University reported that "30% of farmers agreed that government use of remote sensing and other tools to identify issues on private land is an invasion of privacy" (Arbuckle, 2013).

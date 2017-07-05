@@ -3,8 +3,6 @@ Create Nitrogen-Balance Validation Dataset from Public Sources
 Kenneth Qin
 2017-07-04
 
-#### TO DO: Filter counties to not only have a high proportion of corn/soybean, but also a sufficiently high number of corn acres.
-
 Background
 ----------
 
