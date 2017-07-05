@@ -1,7 +1,9 @@
-Create Validation Data from CDL & NEI & NASS
+Create Nitrogen-Balance Validation Dataset from Public Sources
 ================
 Kenneth Qin
-2017-07-03
+2017-07-04
+
+#### TO DO: Filter counties to not only have a high proportion of corn/soybean, but also a sufficiently high number of corn acres.
 
 Background
 ----------
@@ -10,7 +12,7 @@ The main barrier to successfully deploying a satellite-based monitoring system f
 
 In this pilot project, **we do not attempt to predict field-scale attributes using satellite remote sensing**. Instead, we attempt to predict the mean and heterogeneity of **N-balance at the county scale**.
 
-County-scale estimates of total N fertilizer usage was made available in the EPA's National Emissions Inventory (NEI) reports for 2014; these estimates were based on outputs of the Environmental Policy Integrated Climate (EPIC) model. When combined with the Cropland Data Layer's pixel counts of each land cover type for each county, we can identify those counties where the vast majority (i.e. &gt; 95%) of all cultivated area consists of corn/soybean, and make the assumption that all N fertilizer within the county was applied to corn acreage. Through this process we can arrive at a **mean fertilizer application rate for corn** for a subset of counties.
+County-scale estimates of total N fertilizer usage was made available in the EPA's National Emissions Inventory (NEI) reports for 2014; these estimates were based on outputs of the Environmental Policy Integrated Climate (EPIC) model. When combined with the Cropland Data Layer's pixel counts of each land cover type for each county, we can identify those counties where the vast majority (e.g. &gt; 0.95) of all cultivated area consists of corn/soybean, and make the assumption that all N fertilizer within the county was applied to corn acreage. Through this process we can arrive at a **mean fertilizer application rate for corn** for a subset of counties.
 
 County-level production (and yield) data can be retrieved from the USDA National Agricultural Statistics Service (NASS) via Quick Stats.
 
@@ -40,7 +42,8 @@ SQ_METER_PER_PIXEL <- 900
 SQ_METER_PER_ACRE <- 4046.86
 ACRES_PER_SQ_MILE <- 640
 LBS_PER_TON <- 2000
-LBS_N_REMOVED_PER_BU_CORN <- 0.67
+LBS_N_REMOVED_PER_BU_CORN <- 0.67 # From IPNI
+THRESHOLD_CORNSOY <- 0.95 # For high-corn/soy county
 
 # Libraries
 
@@ -49,6 +52,7 @@ library(stringr)
 library(reshape2)
 library(ggplot2)
 library(ggmap)
+theme_set(theme_bw())
 
 # Data imports
 
@@ -63,8 +67,8 @@ cultivated.cats <- paste("Category_", cultivated.codes.str, sep="")
 
 Corn2014 <- read.csv("NASS_corn_county_production_2014.csv")
 
-Fertilizer.State.2014.NASS <- read.csv("NASS_corn_nitrogen_rate_2014.csv")
-Fertilizer.County.2014 <- read.csv("EPA_fertilizer_county_2014.csv")
+Corn.Fertilizer.State.2014.NASS <- read.csv("NASS_corn_nitrogen_rate_2014.csv")
+Fertilizer.County.2014.EPA <- read.csv("EPA_fertilizer_county_2014.csv")
 ```
 
 ### Part 1: Find counties where (nearly) all fertilizer was applied to corn
@@ -130,34 +134,35 @@ hist(CDL2014.ac.select$prop_cornsoybean, main="Hist. of proportion of cultivated
 
 ![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-1.png)
 
-Identify counties with over 95% of cultivated acres consisting of corn or soy.
+Identify counties with over 0.95 of cultivated acres consisting of corn or soy.
 
-First, what proportion of counties have over 95% of their cultivated acreage consist of corn or soy?
+First, what proportion of counties have over 0.95 of their cultivated acreage consist of corn or soy?
 
 ``` r
-# Answer: For 95% threshold, 18% of counties (N=575).
+# Answer: For 98% threshold, 9.5% of counties (N=295).
+#         For 95% threshold, 18% of counties (N=575).
 #         For 90% threshold, 26% of counties (N=813).
-mean(CDL2014.ac.select$prop_cornsoybean > 0.95, na.rm=TRUE)
+mean(CDL2014.ac.select$prop_cornsoybean > THRESHOLD_CORNSOY, na.rm=TRUE)
 ```
 
     ## [1] 0.1852448
 
 ``` r
 # Record these counties' fips codes
-ind.95.cornsoy <- which(CDL2014.ac.select$prop_cornsoybean > 0.95)
-cornsoy.counties.fips <- CDL2014.ac.select$Fips[ind.95.cornsoy]
+ind.hicornsoy.cornsoy <- which(CDL2014.ac.select$prop_cornsoybean > THRESHOLD_CORNSOY)
+cornsoy.counties.fips <- CDL2014.ac.select$Fips[ind.hicornsoy.cornsoy]
 ```
 
 Where are these counties?
 
 ``` r
 # Where are these counties?
-CDL2014.ac.select[ind.95.cornsoy,] %>%
+CDL2014.ac.select[ind.hicornsoy.cornsoy,] %>%
   group_by(STATE) %>%
   summarise(state_n = n()) %>%
   arrange(desc(state_n)) ->
-  CDL.95.statecount
-CDL.95.statecount
+  CDL.hicornsoy.statecount
+CDL.hicornsoy.statecount
 ```
 
     ## # A tibble: 22 × 2
@@ -175,11 +180,11 @@ CDL.95.statecount
     ## 10     VA      14
     ## # ... with 12 more rows
 
-What else do these counties grow?
+What else do these counties grow? Are we justified in multiplying total N fertilizer application by the proportion of corn/soybean acreage to arrive at total N fertilizer application to corn?
 
 ``` r
 # What are the other crops in these counties?
-CDL2014.ac.select[ind.95.cornsoy,] %>%
+CDL2014.ac.select[ind.hicornsoy.cornsoy,] %>%
   select(Corn_all:Lettuce_all) %>%
   summarise_each(funs(sum)) ->
   temp
@@ -192,9 +197,11 @@ ggplot(melt(temp), aes(x=variable, y=value)) + geom_bar(stat='identity') +
 
 ![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-8-1.png)
 
-Aside from corn and soybean, these counties also grow a substantial amount of winter wheat. Winter wheat removes almost twice as much N as corn, which may bias the corn N-balance downwards, but this bias will probably be balanced out by the remainder of crops taking less N than corn. Besides, these crops only make up to 5% of total acreage in these counties.
+Aside from corn and soybean, these counties also grow a substantial amount of winter wheat. Winter wheat demands almost twice as much N as corn, which may bias the corn N-balance downwards if total N applications are multiplied by the proportion of corn/soybean acreage within each county. However, these crops only make up to 0.05 of total acreage in these counties.
 
-#### Checkpoint: How well does CDL data compare to NASS data?
+### Part 2: Compare Datasets Against NASS 2014 Corn Data
+
+#### Calibration Checkpoint 1: How well does CDL acreage data compare to NASS acreage data?
 
 First create standard FIPS code within Corn data.
 
@@ -217,7 +224,8 @@ Now check county total corn acres:
 CDL.NASS.m <- merge(CDL2014.ac.select, Corn2014.w)
 CDL.NASS.cornsoy <- filter(CDL.NASS.m, Fips %in% cornsoy.counties.fips)
 
-ggplot(CDL.NASS.cornsoy, aes(x=Acres.NASS, y=Corn_all)) + geom_point() + 
+ggplot(CDL.NASS.cornsoy, aes(x=Acres.NASS, y=Corn_all)) + 
+  geom_point(alpha=0.5) + 
   geom_abline(intercept=0, slope=1) + ylab("Acres.CDL") +
   ggtitle("CDL vs. NASS estimates of county corn acreage in 2014")
 ```
@@ -226,58 +234,84 @@ ggplot(CDL.NASS.cornsoy, aes(x=Acres.NASS, y=Corn_all)) + geom_point() +
 
 Looks like a good fit!
 
-### Part 2: Extract N fertilizer data from NEI 2014 for this subset of counties
+#### Calibration Checkpoint 2: How well do NEI county-level fertilizer estimates compare to those of state-level NASS fertilizer estimates?
 
-How well does NEI data compare to NASS data? Check state total N fertilizer application.
+Specifically, we will look at corn fertilizer rates. This means that in the EPA NEI-derived fertilizer application estimates, we will only use counties where over 0.95 of acreage consists of corn/soybean.
 
-Something that we may want to consider:
+Some complications that we may want to consider:
 
 -   The NASS data only represents fertilizer applied to corn, so in order to make a fair comparison with EPA estimates, the EPA estimates must be filtered for high-corn/soy counties only.
 -   It appears that NASS state-level fertilizer estimates do **not** include organic N (e.g. manure), whereas EPA county-level fertilizer estimates do. UPDATE: This makes very little difference in overall pattern of calibration curve.
 
+First use EPA NEI's county-level fertilizer estimates to calculate state-level N application rates for corn.
+
 ``` r
-names(Fertilizer.State.2014.NASS)[11] <- "N.lbs.per.ac.NASS"
+names(Corn.Fertilizer.State.2014.NASS)[11] <- "N.lbs.per.ac.NASS"
 
-fips.match <- match(Fertilizer.County.2014$FIPS, CDL2014.ac$Fips)
-Fertilizer.County.2014$Corn.Acres <- CDL2014.ac$Corn_all[fips.match]
+# Merge with CDL data to mark high-corn/soy counties and to get
+# proportion of corn/soy acres
+Fertilizer.County.2014.EPA <- merge(Fertilizer.County.2014.EPA, CDL2014.ac.select,
+                                    by.x="FIPS", by.y="Fips")
 
-# Fertilizer.County.2014 %>%
-#   filter(FIPS %in% cornsoy.counties.fips) %>%
-#   group_by(State) %>%
-#   summarise(N.lbs.per.ac.EPA = LBS_PER_TON * sum(Total.N.Fertilizer) / sum(Corn.Acres),
-#             Inorganic.N.lbs.per.ac.EPA = LBS_PER_TON * sum(Urea.NH4.Fertilizer + NO3.Fertilizer) / sum(Corn.Acres),
-#             N = n()) %>%
-#   mutate(State = toupper(State)) ->
-#   Fertilizer.State.2014.EPA
-
-Fertilizer.County.2014 %>%
+# Intermediary: county-level stats for high-corn/soy counties
+Fertilizer.County.2014.EPA %>%
   filter(FIPS %in% cornsoy.counties.fips) %>%
+  mutate(Corn.N.Fertilizer = prop_cornsoybean * LBS_PER_TON * Total.N.Fertilizer,
+         Corn.Urea.NH4 = prop_cornsoybean * LBS_PER_TON * Urea.NH4.Fertilizer,
+         Corn.NO3 = prop_cornsoybean * LBS_PER_TON * NO3.Fertilizer,
+         Corn.Acres = Corn_all) ->
+  Corn.Fertilizer.County.2014.EPA
+
+# State-level stats estimated from high-corn/soy counties
+Corn.Fertilizer.County.2014.EPA %>%
   group_by(State) %>%
-  summarise(Total.N.Fertilizer = LBS_PER_TON * sum(Total.N.Fertilizer),
-            Total.Urea.NH4 = LBS_PER_TON * sum(Urea.NH4.Fertilizer),
-            Total.NO3 = LBS_PER_TON * sum(NO3.Fertilizer),
-            Total.Corn.Acres = sum(Corn.Acres),
+  summarise(Corn.N.Fertilizer = sum(Corn.N.Fertilizer),
+            Corn.Urea.NH4 = sum(Corn.Urea.NH4),
+            Corn.NO3 = sum(Corn.NO3),
+            Corn.Acres = sum(Corn.Acres),
             n = n()) %>%
-  mutate(N.lbs.per.ac.EPA = Total.N.Fertilizer / Total.Corn.Acres,
-         Inorganic.N.lbs.per.ac.EPA = (Total.Urea.NH4 + Total.NO3) / Total.Corn.Acres,
+  mutate(N.lbs.per.ac.EPA = Corn.N.Fertilizer / Corn.Acres,
+         Inorganic.N.lbs.per.ac.EPA = (Corn.Urea.NH4 + Corn.NO3) / Corn.Acres,
          State = toupper(State)) ->
-  Fertilizer.CornSoyCounties.2014.EPA
+  Corn.Fertilizer.State.2014.EPA
 
-# ggplot(Fertilizer.CornSoyCounties.2014.EPA, aes(x=Total.Corn.Acres, y=Total.N.Fertilizer, label=State)) +
-#   geom_point() + stat_smooth(method="lm") + geom_text(vjust=1.5)
-
-Fertilizer.State.2014.m <- merge(Fertilizer.State.2014.NASS, Fertilizer.CornSoyCounties.2014.EPA)
-
-ggplot(Fertilizer.State.2014.m, aes(x=N.lbs.per.ac.NASS, y=N.lbs.per.ac.EPA, label=State)) +
-  geom_point(aes(size=Total.Corn.Acres)) + geom_abline(intercept=0, slope=1) +
-  geom_text(vjust=1.5) + ggtitle("EPA estimated N rate for high-corn/soy counties\nvs. NASS corn N rate, state aggregation")
+ggplot(Corn.Fertilizer.State.2014.EPA, aes(x=Corn.Acres, y=Corn.N.Fertilizer, label=State)) +
+  geom_point() + stat_smooth(method="lm") + geom_text(vjust=1.5, col="grey30") +
+  ggtitle("EPA-Derived State-Level Corn Fertilizer Rates")
 ```
 
 ![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-12-1.png)
 
+What about individual counties?
+
+``` r
+ggplot(Corn.Fertilizer.County.2014.EPA, aes(x=Corn.Acres, y=Corn.N.Fertilizer, col=State)) +
+  geom_point(alpha=0.3) + 
+  ggtitle("EPA-Derived County-Level Corn Fertilizer Rates\nin High-Corn/Soy Counties")
+```
+
+![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-13-1.png)
+
+Now compare corn N application rates between EPA NEI-derived stats and NASS stats.
+
+``` r
+# Merge EPA data with NASS data
+Corn.Fertilizer.State.2014.m <- merge(Corn.Fertilizer.State.2014.NASS, Corn.Fertilizer.State.2014.EPA)
+
+ggplot(Corn.Fertilizer.State.2014.m, aes(x=N.lbs.per.ac.NASS, y=N.lbs.per.ac.EPA, label=State)) +
+  geom_point(aes(size=Corn.Acres)) + geom_abline(intercept=0, slope=1) +
+  geom_text(vjust=1.5) + 
+  ggtitle("EPA estimated N rate for high-corn/soy counties\nvs. NASS corn N rate, state aggregation") +
+  coord_cartesian(xlim=c(0,200),ylim=c(0,600))
+```
+
+![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-14-1.png)
+
 Clearly the EPA estimates of N rate are in disagreement with the NASS estimates. EPA estimates are almost always higher than NASS estimates, with the exception of Minnesota rates.
 
 It could be that farmers under-report their fertilizer application rates in NASS surveys. It could also be that the EPIC model used by the EPA in estimating fertilizer application rates is biased upward.
+
+Although the EPA estimates differ from the NASS estimates, in the absence of county-level NASS estimates, we will use EPA estimates to derive county-level corn N-balance estimates.
 
 ### Part 3: Calculate N-balance for this subset of counties
 
@@ -286,26 +320,34 @@ Assuming IPNI nutrient removal rate of **0.67 lbs. N / bu**, calculate county-sc
 **NOTE: THIS ASSUMES CONSTANT CORN N REMOVAL RATE. EILEEN ONCE RECOMMENDED AN N REMOVAL RATE THAT VARIED LINEARLY WITH N INPUT.**
 
 ``` r
-Nbalance.cornsoy <- merge(CDL.NASS.cornsoy, Fertilizer.County.2014, by.x="Fips", by.y="FIPS")
+Nbalance.cornsoy <- merge(Corn.Fertilizer.County.2014.EPA, Corn2014.w, by.x="FIPS", by.y="Fips")
+
 Nbalance.cornsoy %>%
-  mutate(Nbal = Total.N.Fertilizer - LBS_N_REMOVED_PER_BU_CORN * Production.NASS / Corn.Acres) ->
+  mutate(Nbal = (Corn.N.Fertilizer - LBS_N_REMOVED_PER_BU_CORN * Production.NASS) /
+           Corn.Acres) ->
   Nbalance.cornsoy
 
-ggplot(Nbalance.cornsoy, aes(x=Nbal)) + geom_histogram(breaks = seq(-1000,46000,1000)) +
+ggplot(Nbalance.cornsoy, aes(x=Nbal)) + geom_histogram() +
+  xlab("County Avg. N-Balance (lbs. N / ac)") +
   ggtitle("Histogram of Average Corn N-Balance for High-Corn/Soy Counties")
 ```
 
-![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-13-1.png)
+    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+
+![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-15-1.png)
 
 Export data for use in other platforms like Tableau:
 
 ``` r
 Nbalance.cornsoy %>%
-  select(Fips, State.x, County.x, Total_cult_ac, Corn.Acres, Total.N.Fertilizer, Organic.N.Fertilizer, Urea.NH4.Fertilizer, NO3.Fertilizer, Production.NASS, Nbal) ->
+  select(FIPS, State.x, County.x, Total_cult_ac, Corn.Acres, Corn.N.Fertilizer,
+         Corn.Urea.NH4, Corn.NO3, Production.NASS, Nbal) ->
   Nbalance.cornsoy.select
-names(Nbalance.cornsoy.select) <- c("FIPS","STATE","COUNTY","Total_Cult_Ac","Corn_Ac","Total_N_Fertilizer","Organic_N_Fertilizer","Urea_NH4_Fertilizer","NO3_Fertilizer","Production_Bu","N_Balance")
+names(Nbalance.cornsoy.select) <- c("FIPS","STATE","COUNTY","Total_Cult_Ac","Corn_Ac","Corn_N_TotalFertilizer",
+  "Corn_N_Urea_NH4","Corn_N_NO3","Production_Bu","N_Balance")
 
-# write.csv(Nbalance.cornsoy.select, "N_balance_highcornsoy_2014.csv", row.names=FALSE)
+# write.csv(Nbalance.cornsoy.select,
+#           paste("N_balance_highcornsoy_2014_",THRESHOLD_CORNSOY,".csv",sep=""), row.names=FALSE)
 ```
 
 Create a map of county average N-balance values:
@@ -335,10 +377,10 @@ map.plot = ggmap(map)
 m1 <- map.plot + geom_path(data=Nbalance.cornsoy.geo, aes(x=long, y=lat, group=group), color="grey") + coord_equal()
 
 m2 <- m1 + geom_polygon(data=Nbalance.cornsoy.geo, aes(x=long, y=lat, group=group, fill=N_Balance)) + 
-  coord_equal() + scale_fill_continuous("N Balance (lbs.N/bu)") +
+  coord_equal() + scale_fill_continuous("N Balance (lbs.N/ac)") +
   ggtitle("Average County-Level Corn N-Balance, 2014")
 
 m2
 ```
 
-![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-15-1.png)
+![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-17-1.png)
