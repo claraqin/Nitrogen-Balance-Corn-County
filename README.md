@@ -44,6 +44,7 @@ ACRES_PER_SQ_MILE <- 640
 LBS_PER_TON <- 2000
 LBS_N_REMOVED_PER_BU_CORN <- 0.67 # From IPNI
 THRESHOLD_CORNSOY <- 0.95 # For high-corn/soy county
+MIN_CORN_ACRES <- 9000 # To reduce variability of area-scaled N-balances
 
 # Libraries
 
@@ -307,11 +308,54 @@ ggplot(Corn.Fertilizer.State.2014.m, aes(x=N.lbs.per.ac.NASS, y=N.lbs.per.ac.EPA
 
 ![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-14-1.png)
 
-Clearly the EPA estimates of N rate are in disagreement with the NASS estimates. EPA estimates are almost always higher than NASS estimates, with the exception of Minnesota rates.
+Clearly the EPA estimates of N rate are in disagreement with the NASS estimates. EPA estimates are almost always higher than NASS estimates, with the exception of Minnesota rates. Possible explanations include the following:
 
-It could be that farmers under-report their fertilizer application rates in NASS surveys. It could also be that the EPIC model used by the EPA in estimating fertilizer application rates is biased upward.
+-   Farmers could be under-reporting their fertilizer application rates in NASS surveys.
+-   The EPIC model used by the EPA in estimating fertilizer application rates could biased upward.
+-   The EPA data has a lot of counties with small corn acreages. These low acreages may result in highly variable area-scaled N-balances.
 
-Although the EPA estimates differ from the NASS estimates, in the absence of county-level NASS estimates, we will use EPA estimates to derive county-level corn N-balance estimates.
+To address the third possibility, we **remove all counties with total corn acres less than a minimum threshold.**
+
+``` r
+Corn.Fertilizer.County.2014.EPA.trim <- filter(Corn.Fertilizer.County.2014.EPA,
+                                               Corn.Acres > MIN_CORN_ACRES)
+dim(Corn.Fertilizer.County.2014.EPA.trim)
+```
+
+    ## [1] 437  35
+
+437 out of 573 counties still remain in the trimmed N-balance dataset.
+
+Re-calculate state-level estimates based on trimmed EPA N-balance estimates:
+
+``` r
+Corn.Fertilizer.County.2014.EPA.trim %>%
+  group_by(State) %>%
+  summarise(Corn.N.Fertilizer = sum(Corn.N.Fertilizer),
+            Corn.Urea.NH4 = sum(Corn.Urea.NH4),
+            Corn.NO3 = sum(Corn.NO3),
+            Corn.Acres = sum(Corn.Acres),
+            n = n()) %>%
+  mutate(N.lbs.per.ac.EPA = Corn.N.Fertilizer / Corn.Acres,
+         Inorganic.N.lbs.per.ac.EPA = (Corn.Urea.NH4 + Corn.NO3) / Corn.Acres,
+         State = toupper(State)) ->
+  Corn.Fertilizer.State.2014.EPA.trim
+
+# Merge trimmed EPA data with NASS data
+Corn.Fertilizer.State.2014.trim.m <- merge(Corn.Fertilizer.State.2014.NASS, Corn.Fertilizer.State.2014.EPA.trim)
+
+ggplot(Corn.Fertilizer.State.2014.trim.m, aes(x=N.lbs.per.ac.NASS, y=N.lbs.per.ac.EPA, label=State)) +
+  geom_point(aes(size=Corn.Acres)) + geom_abline(intercept=0, slope=1) +
+  geom_text(vjust=1.5) + 
+  ggtitle("EPA estimated N rate for high-corn/soy counties\nvs. NASS corn N rate, state aggregation,\nafter removing low-acreage counties") +
+  coord_cartesian(xlim=c(0,200),ylim=c(0,600))
+```
+
+![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-16-1.png)
+
+Trimming low-acreage counties helped to lower the EPA estimates to be closer to the NASS estimates, but the EPA estimates are still substantially higher.
+
+Although the EPA estimates still differ from the NASS estimates, in the absence of county-level NASS estimates, we will use EPA estimates to derive county-level corn N-balance estimates.
 
 ### Part 3: Calculate N-balance for this subset of counties
 
@@ -320,7 +364,7 @@ Assuming IPNI nutrient removal rate of **0.67 lbs. N / bu**, calculate county-sc
 **NOTE: THIS ASSUMES CONSTANT CORN N REMOVAL RATE. EILEEN ONCE RECOMMENDED AN N REMOVAL RATE THAT VARIED LINEARLY WITH N INPUT.**
 
 ``` r
-Nbalance.cornsoy <- merge(Corn.Fertilizer.County.2014.EPA, Corn2014.w, by.x="FIPS", by.y="Fips")
+Nbalance.cornsoy <- merge(Corn.Fertilizer.County.2014.EPA.trim, Corn2014.w, by.x="FIPS", by.y="Fips")
 
 Nbalance.cornsoy %>%
   mutate(Nbal = (Corn.N.Fertilizer - LBS_N_REMOVED_PER_BU_CORN * Production.NASS) /
@@ -334,20 +378,31 @@ ggplot(Nbalance.cornsoy, aes(x=Nbal)) + geom_histogram() +
 
     ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 
-![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-15-1.png)
+![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-17-1.png)
 
-Export data for use in other platforms like Tableau:
+Export data for use in other platforms:
 
 ``` r
 Nbalance.cornsoy %>%
   select(FIPS, State.x, County.x, Total_cult_ac, Corn.Acres, Corn.N.Fertilizer,
          Corn.Urea.NH4, Corn.NO3, Production.NASS, Nbal) ->
   Nbalance.cornsoy.select
+
 names(Nbalance.cornsoy.select) <- c("FIPS","STATE","COUNTY","Total_Cult_Ac","Corn_Ac","Corn_N_TotalFertilizer",
   "Corn_N_Urea_NH4","Corn_N_NO3","Production_Bu","N_Balance")
 
 # write.csv(Nbalance.cornsoy.select,
 #           paste("N_balance_highcornsoy_2014_",THRESHOLD_CORNSOY,".csv",sep=""), row.names=FALSE)
+```
+
+#### N-Balance Filled Map
+
+To make fill scale more informative, remove the outlying N-balance values:
+
+``` r
+Nbalance.cornsoy.select %>%
+  filter(N_Balance < 1500) ->
+  Nbalance.cornsoy.out
 ```
 
 Create a map of county average N-balance values:
@@ -357,10 +412,10 @@ Create a map of county average N-balance values:
 counties <- map_data("county")
 counties$state_county <- paste(counties$region, counties$subregion)
 
-Nbalance.cornsoy.select$state_county <- paste(tolower(Nbalance.cornsoy.select$STATE),
-                                              tolower(Nbalance.cornsoy.select$COUNTY))
+Nbalance.cornsoy.out$state_county <- paste(tolower(Nbalance.cornsoy.out$STATE),
+                                           tolower(Nbalance.cornsoy.out$COUNTY))
 
-Nbalance.cornsoy.geo <- merge(counties, Nbalance.cornsoy.select)
+Nbalance.cornsoy.geo <- merge(counties, Nbalance.cornsoy.out)
 Nbalance.cornsoy.geo <- arrange(Nbalance.cornsoy.geo, group, order)
 
 # Retrieve base map from Google Maps
@@ -383,4 +438,4 @@ m2 <- m1 + geom_polygon(data=Nbalance.cornsoy.geo, aes(x=long, y=lat, group=grou
 m2
 ```
 
-![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-17-1.png)
+![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-20-1.png)
