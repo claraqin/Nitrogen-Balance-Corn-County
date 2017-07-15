@@ -1,5 +1,5 @@
 ---
-title: "Create Nitrogen-Balance Validation Dataset from Public Sources"
+title: "Create County-Average Corn Nitrogen-Balance Estimates from Public Datasets"
 author: "Kenneth Qin"
 date: "`r format(Sys.Date())`"
 output: github_document
@@ -7,34 +7,33 @@ output: github_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#knitr::opts_knit$set(root.dir = "C:/Users/kqin/Documents/Remote Sensing/Remote Sensing of N/Validation Data/CDL")
 ```
 
 ## Background
 
-The main barrier to successfully deploying a satellite-based monitoring system for targeted fertilizer conservation programs is the lack of sufficient ground-truthed field-scale fertilizer application data. In theory, if we could receive annual reports of yield, crop type, and nitrogen (N) fertilizer application rate from each field in the U.S., we could develop a crude N-balance prediction system that operates at the field-scale. However, this data is elusive in part because of the legitimate concern for farmers' privacy rights. A recent study from Iowa State University reported that "30% of farmers agreed that government use of remote sensing and other tools to identify issues on private land is an invasion of privacy" (Arbuckle, 2013).
+The main barrier to successfully deploying a targeted fertilizer conservation program for commodity crops is the lack of sufficiently high-coverage, high-resolution fertilizer application data. In theory, if we could receive annual reports of yield, crop type, and nitrogen (N) fertilizer application rate from each field in the U.S., we could develop a crude N-balance prediction system that operates at the field-scale. However, this data is elusive in part because of the prevalent concern for farmers' privacy rights. A 2013 [study](http://www.tandfonline.com/doi/abs/10.1080/08941920.2012.671450) from Iowa State University reported that "30% of farmers agreed that government use of remote sensing and other tools to identify issues on private land is an invasion of privacy" (Arbuckle).
 
-In this pilot project, **we do not attempt to predict field-scale attributes using satellite remote sensing**. Instead, we attempt to predict the mean and heterogeneity of **N-balance at the county scale**.
+Thus in this pilot project, **we do not attempt to calculate any field-scale attributes**. Instead, we attempt to predict the mean and heterogeneity of **N-balance for corn fields at the county scale**. In theory, once corn N-balance has been calculated for each county, we will have created a dataset that can be used to validate independent predictions of **county-level** N-balance. Such a model would allow for semi-targeted conservation programs that enroll counties instead of individual farmers.
 
-County-scale estimates of total N fertilizer usage was made available in the EPA's National Emissions Inventory (NEI) reports for 2014; these estimates were based on outputs of the Environmental Policy Integrated Climate (EPIC) model. When combined with the Cropland Data Layer's pixel counts of each land cover type for each county, we can identify those counties where the vast majority (e.g. > 0.95) of all cultivated area consists of corn/soybean, and make the assumption that all N fertilizer within the county was applied to corn acreage. Through this process we can arrive at a **mean fertilizer application rate for corn** for a subset of counties.
 
-County-level production (and yield) data can be retrieved from the USDA National Agricultural Statistics Service (NASS) via Quick Stats.
+## Data Sources
+
+County-scale estimates of total N fertilizer usage was made available in the EPA's National Emissions Inventory (NEI) reports for 2014; these estimates were based on modeled crop demand (see their [Technical Support Document](https://www.epa.gov/air-emissions-inventories/2014-national-emissions-inventory-nei-technical-support-document-tsd)). When combined with the [Cropland Data Layer's](https://nassgeodata.gmu.edu/CropScape/) pixel counts of each land cover type for each county, we can identify those counties where the vast majority (e.g. > 0.95) of all cultivated area consists of corn/soybean, and make the assumption that all N fertilizer within the county was applied to corn acreage. Through this process we can arrive at a **county-average fertilizer application rate for corn** for a subset of counties.
+
+County-level production (and yield) data can be retrieved from the USDA National Agricultural Statistics Service (NASS) via [Quick Stats](https://quickstats.nass.usda.gov/).
 
 **County-level N-balance for corn** can then be calculated through the following equation:
 
+$$ N.balance = N.input - N.output = N.input - Crop.Production * N.removal.rate $$
 
-N.balance = N.input - N.output = N.input - Crop.Production * N.removal.rate
-
-
-This simplified N-balance equation is sufficient for our purpose of generating county-level validation data for predicting corn N-balance, though we recognize that we are making the following assumptions:
+This simplified N-balance equation is sufficient for our purpose of estimating county-level corn N-balance, though we recognize that we are making the following assumptions:
 
 * Corn stover / stubble is not removed from the field.
 * The grain has the standard moisture content of 15.5%.
 * The grain has a constant N concentration of 1.4%.
 
-*See <http://www.ipni.net/article/IPNI-3296> for details on the grain N calculation.*
+See the International Plant Nutrition Institute's (IPNI's) [website](http://www.ipni.net/article/IPNI-3296) for details on the grain N calculation.
 
-Once corn N-balance has been calculated for each county, we will have produced a dataset for use in validating an *a priori* model that converts vegetation indices collected through satellite remote sensing into county-level N-balance predictions.
 
 ## Analysis
 
@@ -381,10 +380,10 @@ map = get_map(location = c(-87, 39),
 map.plot = ggmap(map)
 
 # Create choropleth (filled) map
-m1 <- map.plot + geom_path(data=Nbalance.cornsoy.geo, aes(x=long, y=lat, group=group), color="grey") + coord_equal()
+m1 <- map.plot + geom_path(data=Nbalance.cornsoy.geo, aes(x=long, y=lat, group=group), color="grey")
 
 m2 <- m1 + geom_polygon(data=Nbalance.cornsoy.geo, aes(x=long, y=lat, group=group, fill=N_Balance)) + 
-  coord_equal() + scale_fill_continuous("N Balance (lbs.N/ac)") +
+  scale_fill_continuous("N Balance (lbs.N/ac)") +
   ggtitle("Average County-Level Corn N-Balance, 2014")
 
 m2
