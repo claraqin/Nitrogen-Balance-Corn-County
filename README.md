@@ -23,7 +23,7 @@ County-level production (and yield) data can be retrieved from the USDA [**Natio
 
 County-level N-balance for corn can then be calculated through the following equation:
 
-*N.balance = N.input - N.output = N.input - Crop.Production \* N.removal.rate*
+*N.balance = N.input - N.output = N.input - Crop.production \* N.removal.rate*
 
 This simplified N-balance equation is sufficient for our purpose of estimating county-level corn N-balance, though we recognize that we are making the following assumptions:
 
@@ -38,7 +38,13 @@ See the International Plant Nutrition Institute's (IPNI's) [website](http://www.
 Analysis
 --------
 
-Define constants, load libraries, and import data.
+Our analysis is divided into 3 parts:
+
+1.  Find counties where (nearly) all fertilizer was applied to corn
+2.  Compare datasets against NASS 2014 corn data
+3.  Calculate and map N-balance for this subset of counties
+
+We begin by defining constants, loading libraries, and importing data.
 
 ``` r
 # Constants
@@ -124,7 +130,7 @@ range(prop.cultivated)
 
     ## [1] 0.0000000 0.9029783
 
-Calculate proportion of corn+soybean out of total CULTIVATED AREA.
+Calculate proportion of corn+soybean out of total *cultivated* area.
 
 ``` r
 CDL2014.ac.select <- select(CDL2014.ac, -(Category_001:Category_254))
@@ -210,9 +216,9 @@ Aside from corn and soybean, these counties also grow a substantial amount of wi
 
 Of course, these non-corn/soy crops only make up to 0.05 of total acreage in these counties.
 
-### Part 2: Compare Datasets Against NASS 2014 Corn Data
+### Part 2: Compare datasets against NASS 2014 corn data
 
-#### Calibration Checkpoint A: How well does CDL acreage data compare to NASS acreage data?
+#### Calibration checkpoint A: How well does CDL acreage data compare to NASS acreage data?
 
 First create standard FIPS code within NASS corn data.
 
@@ -246,7 +252,7 @@ ggplot(CDL.NASS.cornsoy, aes(x=Acres.NASS, y=Corn_all)) +
 
 Looks like a good fit!
 
-#### Calibration Checkpoint B: How well do EPA county-level fertilizer estimates compare to those of state-level NASS fertilizer estimates?
+#### Calibration checkpoint B: How well do EPA county-level fertilizer estimates compare to those of state-level NASS fertilizer estimates?
 
 Specifically, we will look at corn fertilizer rates. This means that in the EPA EPA-derived fertilizer application estimates, we will only use counties where over 0.95 of acreage consists of corn/soybean.
 
@@ -407,7 +413,7 @@ names(Nbalance.cornsoy.select) <- c("FIPS","STATE","COUNTY","Total_Cult_Ac","Cor
 #           paste("N_balance_highcornsoy_2014_",THRESHOLD_CORNSOY,".csv",sep=""), row.names=FALSE)
 ```
 
-#### N-Balance Filled Map
+#### N-balance filled map (choropleth)
 
 To make fill scale more informative, remove the outlying N-balance values:
 
