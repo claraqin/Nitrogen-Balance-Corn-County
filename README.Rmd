@@ -123,7 +123,7 @@ range(prop.cultivated)
 
 Calculate proportion of corn+soybean out of total CULTIVATED AREA.
 
-```{r}
+```{r, warning=FALSE}
 CDL2014.ac.select <- select(CDL2014.ac, -(Category_001:Category_254))
 
 CDL2014.ac.select %>%
@@ -132,7 +132,9 @@ CDL2014.ac.select %>%
          prop_cornsoybean = (Corn_all + Soybeans_all) / Total_cult_ac) ->
   CDL2014.ac.select
 
-hist(CDL2014.ac.select$prop_cornsoybean, main="Hist. of proportion of cultivated area\nconsisting of corn or soy")
+ggplot(CDL2014.ac.select, aes(x=prop_cornsoybean)) + geom_histogram(bins=30) +
+  ggtitle("Hist. of proportion of cultivated area\nconsisting of corn or soy") +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 Identify counties with over `r THRESHOLD_CORNSOY` of cultivated acres consisting of corn or soy.
@@ -336,7 +338,7 @@ Although the EPA estimates still differ from the NASS estimates, in the absence 
 Assuming IPNI nutrient removal rate of **`r LBS_N_REMOVED_PER_BU_CORN` lbs. N / bu**, calculate county-scale N-balance (lbs. N / ac).
 
 
-```{r}
+```{r, warning=FALSE}
 Nbalance.cornsoy <- merge(Corn.Fertilizer.County.2014.EPA.trim, Corn2014.w, by.x="FIPS", by.y="Fips")
 
 Nbalance.cornsoy %>%
@@ -344,7 +346,7 @@ Nbalance.cornsoy %>%
            Corn.Acres) ->
   Nbalance.cornsoy
 
-ggplot(Nbalance.cornsoy, aes(x=Nbal)) + geom_histogram() +
+ggplot(Nbalance.cornsoy, aes(x=Nbal)) + geom_histogram(bins=30) +
   xlab("County Avg. N-Balance (lbs. N / ac)") +
   ggtitle("Histogram of average corn N-balance for high-corn/soy counties") +
   theme(plot.title = element_text(hjust = 0.5))

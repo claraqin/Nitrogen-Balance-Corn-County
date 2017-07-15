@@ -135,7 +135,9 @@ CDL2014.ac.select %>%
          prop_cornsoybean = (Corn_all + Soybeans_all) / Total_cult_ac) ->
   CDL2014.ac.select
 
-hist(CDL2014.ac.select$prop_cornsoybean, main="Hist. of proportion of cultivated area\nconsisting of corn or soy")
+ggplot(CDL2014.ac.select, aes(x=prop_cornsoybean)) + geom_histogram(bins=30) +
+  ggtitle("Hist. of proportion of cultivated area\nconsisting of corn or soy") +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 ![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-1.png)
@@ -382,13 +384,11 @@ Nbalance.cornsoy %>%
            Corn.Acres) ->
   Nbalance.cornsoy
 
-ggplot(Nbalance.cornsoy, aes(x=Nbal)) + geom_histogram() +
+ggplot(Nbalance.cornsoy, aes(x=Nbal)) + geom_histogram(bins=30) +
   xlab("County Avg. N-Balance (lbs. N / ac)") +
   ggtitle("Histogram of average corn N-balance for high-corn/soy counties") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-
-    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 
 ![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-17-1.png)
 
