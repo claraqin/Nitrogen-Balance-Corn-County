@@ -1,6 +1,6 @@
 ---
 title: "Create County-Average Corn Nitrogen-Balance Estimates from Public Datasets"
-author: "Kenneth Qin"
+author: "Clara Qin"
 date: "`r format(Sys.Date())`"
 output: github_document
 ---

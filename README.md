@@ -1,6 +1,6 @@
 Create County-Average Corn Nitrogen-Balance Estimates from Public Datasets
 ================
-Kenneth Qin
+Clara Qin
 2017-07-14
 
 Background
